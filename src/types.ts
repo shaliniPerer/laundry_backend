@@ -11,7 +11,9 @@ export type UserRecord = EntityBase & {
   email: string;
   passwordHash: string;
   name: string;
+  phone?: string;
   roleId?: string;
+  userNumber?: string;
 };
 
 export type CustomerRecord = EntityBase & {

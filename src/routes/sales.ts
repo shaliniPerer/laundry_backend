@@ -108,6 +108,8 @@ salesRouter.post("/pos", async (req: AuthedRequest, res) => {
     deliveryDate: string;
     status?: string;
     otherCharges?: number;
+    discountOnAll?: number;
+    discountOnAllType?: string;
     lines: SaleRecord["lines"];
     payments?: SalePayment[];
     sendSms?: boolean;
@@ -125,7 +127,8 @@ salesRouter.post("/pos", async (req: AuthedRequest, res) => {
   }
 
   const linesTotal = body.lines.reduce((s, l) => s + Number(l.lineTotal ?? 0), 0);
-  const total = linesTotal + Number(body.otherCharges ?? 0);
+  const discountOnAll = Number(body.discountOnAll ?? 0);
+  const total = linesTotal + Number(body.otherCharges ?? 0) - discountOnAll;
   const payments: SalePayment[] = body.payments ?? [];
   const paidAmount = payments.reduce((s, p) => s + p.amount, 0);
   const paymentStatus = paidAmount <= 0 ? "Unpaid" : paidAmount >= total ? "Paid" : "Partial";
@@ -146,6 +149,8 @@ salesRouter.post("/pos", async (req: AuthedRequest, res) => {
     status: body.status ?? "Pending",
     paymentStatus,
     otherCharges: Number(body.otherCharges ?? 0),
+    discountOnAll: discountOnAll || undefined,
+    discountOnAllType: discountOnAll > 0 ? body.discountOnAllType : undefined,
     createdBy,
     payments,
     lines: body.lines,
