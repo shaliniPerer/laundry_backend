@@ -106,6 +106,7 @@ salesRouter.post("/pos", async (req: AuthedRequest, res) => {
     customerName?: string;
     customerMobile?: string;
     deliveryDate: string;
+    deliveryTime?: string;
     status?: string;
     otherCharges?: number;
     discountOnAll?: number;
@@ -143,6 +144,7 @@ salesRouter.post("/pos", async (req: AuthedRequest, res) => {
     customerName: body.customerName,
     customerMobile: body.customerMobile,
     deliveryDate: body.deliveryDate,
+    deliveryTime: body.deliveryTime,
     total,
     subtotal: linesTotal,
     paidAmount,
@@ -277,6 +279,7 @@ salesRouter.put("/:id", async (req: AuthedRequest, res) => {
     customerName: body.customerName ?? existing.customerName,
     customerMobile: body.customerMobile ?? existing.customerMobile,
     deliveryDate: body.deliveryDate ?? existing.deliveryDate,
+    deliveryTime: body.deliveryTime ?? existing.deliveryTime,
     status: body.status ?? existing.status,
     referenceNo: body.referenceNo ?? existing.referenceNo,
     note: body.note ?? existing.note,

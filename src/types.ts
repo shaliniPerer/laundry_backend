@@ -99,6 +99,7 @@ export type SaleRecord = EntityBase & {
   customerName?: string;
   customerMobile?: string;
   deliveryDate: string;
+  deliveryTime?: string;
   total: number;
   subtotal?: number;
   paidAmount?: number;
@@ -272,4 +273,13 @@ export type SmsTemplateRecord = EntityBase & {
   body: string;
   /** true = user-created template, false = override of a built-in template */
   isCustom: boolean;
+};
+
+export type SettingsRecord = EntityBase & {
+  entityType: "SETTINGS";
+  companyName?: string;
+  address?: string;
+  phone?: string;
+  website?: string;
+  email?: string;
 };

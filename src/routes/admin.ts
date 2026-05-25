@@ -2,7 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { v4 as uuid } from "uuid";
 import { deleteItem, getItem, putItem, scanByEntityPrefix, updateItem } from "../db/repo.js";
-import type { RoleRecord, UserRecord } from "../types.js";
+import type { RoleRecord, SettingsRecord, UserRecord } from "../types.js";
 import { authMiddleware } from "../middleware/auth.js";
 
 const now = () => new Date().toISOString();
@@ -112,7 +112,63 @@ adminRouter.post("/roles", async (req, res) => {
   res.status(201).json({ id, ...rec });
 });
 
+adminRouter.patch("/roles/:id", async (req, res) => {
+  const pk = `ROLE#${req.params.id}`;
+  const existing = await getItem(pk, "PROFILE");
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  const { name, permissions } = req.body as { name?: string; permissions?: string[] };
+  const updates: Record<string, unknown> = { updatedAt: now() };
+  if (name != null) updates.name = name;
+  if (permissions != null) updates.permissions = permissions;
+  await updateItem(pk, "PROFILE", updates);
+  res.json({ ok: true });
+});
+
 adminRouter.delete("/roles/:id", async (req, res) => {
   await deleteItem(`ROLE#${req.params.id}`, "PROFILE");
+  res.json({ ok: true });
+});
+
+/** GET /api/admin/settings */
+adminRouter.get("/settings", async (_req, res) => {
+  const row = await getItem("SETTINGS#global", "META") as SettingsRecord | undefined;
+  res.json({
+    companyName: row?.companyName ?? "",
+    address: row?.address ?? "",
+    phone: row?.phone ?? "",
+    website: row?.website ?? "",
+    email: row?.email ?? "",
+  });
+});
+
+/** PUT /api/admin/settings */
+adminRouter.put("/settings", async (req, res) => {
+  const { companyName, address, phone, website, email } = req.body as {
+    companyName?: string; address?: string; phone?: string; website?: string; email?: string;
+  };
+  const existing = await getItem("SETTINGS#global", "META");
+  if (existing) {
+    await updateItem("SETTINGS#global", "META", {
+      ...(companyName != null && { companyName }),
+      ...(address != null && { address }),
+      ...(phone != null && { phone }),
+      ...(website != null && { website }),
+      ...(email != null && { email }),
+      updatedAt: now(),
+    });
+  } else {
+    await putItem({
+      pk: "SETTINGS#global",
+      sk: "META",
+      entityType: "SETTINGS",
+      companyName: companyName ?? "",
+      address: address ?? "",
+      phone: phone ?? "",
+      website: website ?? "",
+      email: email ?? "",
+      createdAt: now(),
+      updatedAt: now(),
+    });
+  }
   res.json({ ok: true });
 });
