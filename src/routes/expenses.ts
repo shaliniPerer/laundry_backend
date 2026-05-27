@@ -99,8 +99,8 @@ expensesRouter.delete("/categories/:id", async (req, res) => {
 
 expensesRouter.post("/", async (req, res) => {
   const b = req.body as Partial<ExpenseRecord> & { attachment?: IncomingAttachment };
-  if (b.amount == null || !b.date) {
-    res.status(400).json({ error: "amount and date required" });
+  if (b.amount == null || !b.date || !b.expenseFor) {
+    res.status(400).json({ error: "amount, date and expenseFor required" });
     return;
   }
   const id = uuid();

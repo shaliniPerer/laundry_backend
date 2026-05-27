@@ -71,6 +71,7 @@ export async function updateItem(
   const sets: string[] = [];
   let i = 0;
   for (const [k, v] of Object.entries(updates)) {
+    if (v === undefined) continue; // skip undefined — leave existing DynamoDB value unchanged
     const nk = `#n${i}`;
     const vk = `:v${i}`;
     names[nk] = k;

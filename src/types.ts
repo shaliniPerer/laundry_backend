@@ -107,6 +107,7 @@ export type SaleRecord = EntityBase & {
   paymentStatus?: string;
   otherCharges?: number;
   otherChargesType?: string;
+  otherChargeItems?: { description: string; amount: number }[];
   discountOnAll?: number;
   discountOnAllType?: string;
   roundOff?: number;

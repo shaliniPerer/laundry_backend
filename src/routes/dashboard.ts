@@ -20,6 +20,9 @@ dashboardRouter.get("/deliveries", async (req, res) => {
     res.status(400).json({ error: "start and end query params required (YYYY-MM-DD)" });
     return;
   }
+  const statusFilter = req.query.statuses
+    ? String(req.query.statuses).split(",").map((s) => s.trim().toLowerCase())
+    : null;
   const [saleItems, customerItems] = await Promise.all([
     scanSalesByDeliveryRange(start, end),
     scanByEntityPrefix("CUSTOMER#"),
@@ -32,16 +35,22 @@ dashboardRouter.get("/deliveries", async (req, res) => {
       customerMap[id] = customer.name;
     }
   }
-  const sales = saleItems.map((s) => {
-    const sale = s as SaleRecord;
-    const customerId = sale.customerId || "";
-    return {
-      ...sale,
-      customerName: customerId
-        ? (customerMap[customerId] || sale.customerName || "Walk In Customer")
-        : (sale.customerName || "Walk In Customer"),
-    };
-  });
+  const sales = saleItems
+    .filter((s) => {
+      if (!statusFilter) return true;
+      const st = ((s as SaleRecord).status || "").toLowerCase().replace(/[\s-]+/g, "_");
+      return statusFilter.includes(st);
+    })
+    .map((s) => {
+      const sale = s as SaleRecord;
+      const customerId = sale.customerId || "";
+      return {
+        ...sale,
+        customerName: customerId
+          ? (customerMap[customerId] || sale.customerName || "Walk In Customer")
+          : (sale.customerName || "Walk In Customer"),
+      };
+    });
   res.json({ sales });
 });
 
