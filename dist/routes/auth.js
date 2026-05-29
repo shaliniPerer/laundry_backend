@@ -77,3 +77,86 @@ authRouter.get("/me", authMiddleware, async (req, res) => {
         roleId: u.roleId,
     });
 });
+/**
+ * PATCH /api/auth/me  — update name (and optionally email)
+ */
+authRouter.patch("/me", authMiddleware, async (req, res) => {
+    const id = req.userId;
+    const { name, email } = req.body;
+    if (!name && !email) {
+        res.status(400).json({ error: "name or email required" });
+        return;
+    }
+    const u = (await getItem(`USER#${id}`, "PROFILE"));
+    if (!u) {
+        res.status(404).json({ error: "Not found" });
+        return;
+    }
+    const updates = { updatedAt: now() };
+    if (name)
+        updates.name = name;
+    if (email)
+        updates.email = email.toLowerCase();
+    const { updateItem } = await import("../db/repo.js");
+    await updateItem(`USER#${id}`, "PROFILE", updates);
+    res.json({ ok: true, name: updates.name ?? u.name, email: updates.email ?? u.email });
+});
+/**
+ * POST /api/auth/change-password  — verify current password then set new one
+ */
+authRouter.post("/change-password", authMiddleware, async (req, res) => {
+    const id = req.userId;
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+        res.status(400).json({ error: "currentPassword and newPassword required" });
+        return;
+    }
+    if (newPassword.length < 6) {
+        res.status(400).json({ error: "New password must be at least 6 characters" });
+        return;
+    }
+    const u = (await getItem(`USER#${id}`, "PROFILE"));
+    if (!u) {
+        res.status(404).json({ error: "Not found" });
+        return;
+    }
+    const ok = await bcrypt.compare(currentPassword, u.passwordHash);
+    if (!ok) {
+        res.status(401).json({ error: "Current password is incorrect" });
+        return;
+    }
+    const { updateItem } = await import("../db/repo.js");
+    await updateItem(`USER#${id}`, "PROFILE", {
+        passwordHash: await bcrypt.hash(newPassword, 10),
+        updatedAt: now(),
+    });
+    res.json({ ok: true });
+});
+/**
+ * POST /api/auth/forgot-password  — reset password by email (admin lookup, no email service)
+ * For a local system: finds user by email and resets to supplied newPassword if provided,
+ * or returns a one-time token. Here we simply accept email + newPassword.
+ */
+authRouter.post("/forgot-password", async (req, res) => {
+    const { email, newPassword } = req.body;
+    if (!email || !newPassword) {
+        res.status(400).json({ error: "email and newPassword required" });
+        return;
+    }
+    if (newPassword.length < 6) {
+        res.status(400).json({ error: "Password must be at least 6 characters" });
+        return;
+    }
+    const users = await scanByEntityPrefix("USER#");
+    const user = users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+    if (!user) {
+        res.status(404).json({ error: "No account found with that email" });
+        return;
+    }
+    const { updateItem } = await import("../db/repo.js");
+    await updateItem(user.pk, "PROFILE", {
+        passwordHash: await bcrypt.hash(newPassword, 10),
+        updatedAt: now(),
+    });
+    res.json({ ok: true });
+});

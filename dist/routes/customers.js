@@ -10,20 +10,56 @@ customersRouter.get("/", async (_req, res) => {
     res.json({ customers: rows });
 });
 customersRouter.post("/", async (req, res) => {
-    const { name, phone, email, address } = req.body;
-    if (!name) {
-        res.status(400).json({ error: "name required" });
+    const b = req.body;
+    // Build name from firstName + lastName (ignore salutation for uniqueness)
+    const baseName = [b.firstName, b.lastName].filter(Boolean).join(" ").trim();
+    const derivedName = b.name?.trim() || [b.salutation, b.firstName, b.lastName].filter(Boolean).join(" ");
+    if (!baseName) {
+        res.status(400).json({ error: "firstName or lastName required" });
         return;
     }
+    // Check uniqueness by baseName (no salutation) and mobile
+    const existing = await scanByEntityPrefix("CUSTOMER#");
+    if (b.mobile?.trim()) {
+        const duplicate = existing.find((r) => {
+            const rec = r;
+            if (rec.entityType !== "CUSTOMER")
+                return false;
+            const recBaseName = [rec.firstName, rec.lastName].filter(Boolean).join(" ").trim();
+            return (recBaseName.toLowerCase() === baseName.toLowerCase() &&
+                rec.mobile?.trim() === b.mobile.trim());
+        });
+        if (duplicate) {
+            res.status(409).json({ error: "Sorry! This customer already exists with this name and mobile number" });
+            return;
+        }
+    }
+    const count = existing.filter((r) => r.entityType === "CUSTOMER").length + 1;
+    const customerNumber = `CU${String(count).padStart(4, "0")}`;
     const id = uuid();
     const rec = {
         pk: `CUSTOMER#${id}`,
         sk: "PROFILE",
         entityType: "CUSTOMER",
-        name,
-        phone,
-        email,
-        address,
+        customerNumber,
+        salutation: b.salutation,
+        firstName: b.firstName,
+        lastName: b.lastName,
+        name: derivedName,
+        mobile: b.mobile?.trim() || undefined,
+        phone: b.phone,
+        email: b.email,
+        gstNumber: b.gstNumber,
+        taxNumber: b.taxNumber,
+        country: b.country,
+        state: b.state,
+        city: b.city,
+        postcode: b.postcode,
+        address: b.address,
+        previousDue: b.previousDue != null ? Number(b.previousDue) : undefined,
+        discountType: b.discountType,
+        discount: b.discount != null ? Number(b.discount) : undefined,
+        status: b.status || "active",
         createdAt: now(),
         updatedAt: now(),
     };
@@ -36,19 +72,34 @@ customersRouter.post("/import", async (req, res) => {
         res.status(400).json({ error: "rows array required" });
         return;
     }
+    const existing = await scanByEntityPrefix("CUSTOMER#");
+    let count = existing.filter((r) => r.entityType === "CUSTOMER").length;
     const created = [];
     for (const r of rows) {
         if (!r?.name)
             continue;
+        count++;
         const id = uuid();
         const rec = {
             pk: `CUSTOMER#${id}`,
             sk: "PROFILE",
             entityType: "CUSTOMER",
+            customerNumber: `CU${String(count).padStart(4, "0")}`,
             name: String(r.name),
+            mobile: r.mobile,
             phone: r.phone,
             email: r.email,
+            gstNumber: r.gstNumber,
+            taxNumber: r.taxNumber,
+            country: r.country,
+            state: r.state,
+            city: r.city,
+            postcode: r.postcode,
             address: r.address,
+            previousDue: r.previousDue != null ? Number(r.previousDue) : undefined,
+            discountType: r.discountType,
+            discount: r.discount != null ? Number(r.discount) : undefined,
+            status: r.status || "active",
             createdAt: now(),
             updatedAt: now(),
         };
@@ -72,12 +123,37 @@ customersRouter.patch("/:id", async (req, res) => {
         res.status(404).json({ error: "Not found" });
         return;
     }
-    const { name, phone, email, address } = req.body;
+    const b = req.body;
+    // Check mobile uniqueness on update (skip current record)
+    if (b.mobile?.trim()) {
+        const all = await scanByEntityPrefix("CUSTOMER#");
+        const duplicate = all.find((r) => r.entityType === "CUSTOMER" &&
+            r.pk !== pk &&
+            r.mobile?.trim() === b.mobile.trim());
+        if (duplicate) {
+            res.status(409).json({ error: "Sorry! This mobile number already exist" });
+            return;
+        }
+    }
     await updateItem(pk, "PROFILE", {
-        ...(name != null ? { name } : {}),
-        ...(phone != null ? { phone } : {}),
-        ...(email != null ? { email } : {}),
-        ...(address != null ? { address } : {}),
+        ...(b.salutation != null ? { salutation: b.salutation } : {}),
+        ...(b.firstName != null ? { firstName: b.firstName } : {}),
+        ...(b.lastName != null ? { lastName: b.lastName } : {}),
+        ...(b.name != null ? { name: b.name } : {}),
+        ...(b.mobile != null ? { mobile: b.mobile } : {}),
+        ...(b.phone != null ? { phone: b.phone } : {}),
+        ...(b.email != null ? { email: b.email } : {}),
+        ...(b.gstNumber != null ? { gstNumber: b.gstNumber } : {}),
+        ...(b.taxNumber != null ? { taxNumber: b.taxNumber } : {}),
+        ...(b.country != null ? { country: b.country } : {}),
+        ...(b.state != null ? { state: b.state } : {}),
+        ...(b.city != null ? { city: b.city } : {}),
+        ...(b.postcode != null ? { postcode: b.postcode } : {}),
+        ...(b.address != null ? { address: b.address } : {}),
+        ...(b.previousDue != null ? { previousDue: Number(b.previousDue) } : {}),
+        ...(b.discountType != null ? { discountType: b.discountType } : {}),
+        ...(b.discount != null ? { discount: Number(b.discount) } : {}),
+        ...(b.status != null ? { status: b.status } : {}),
         updatedAt: now(),
     });
     res.json({ ok: true });

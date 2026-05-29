@@ -16,29 +16,47 @@ customersRouter.get("/", async (_req, res) => {
 
 customersRouter.post("/", async (req, res) => {
   const b = req.body as Partial<CustomerRecord>;
-  // Build name from salutation + firstName + lastName if not explicitly provided
-  const derivedName =
-    b.name?.trim() ||
-    [b.salutation, b.firstName, b.lastName].filter(Boolean).join(" ");
-  if (!derivedName) {
-    res.status(400).json({ error: "name required" });
+  // Build name from firstName + lastName (ignore salutation for uniqueness)
+  const baseName = [b.firstName, b.lastName].filter(Boolean).join(" ").trim();
+  const derivedName = b.name?.trim() || [b.salutation, b.firstName, b.lastName].filter(Boolean).join(" ");
+  if (!baseName) {
+    res.status(400).json({ error: "firstName or lastName required" });
     return;
   }
-  // Check mobile uniqueness
+  // Check uniqueness by baseName (no salutation) and mobile
   const existing = await scanByEntityPrefix("CUSTOMER#");
   if (b.mobile?.trim()) {
     const duplicate = existing.find(
-      (r) =>
-        (r as CustomerRecord).entityType === "CUSTOMER" &&
-        (r as CustomerRecord).mobile?.trim() === b.mobile!.trim()
+      (r) => {
+        const rec = r as CustomerRecord;
+        if (rec.entityType !== "CUSTOMER") return false;
+        const recBaseName = [rec.firstName, rec.lastName].filter(Boolean).join(" ").trim();
+        return (
+          recBaseName.toLowerCase() === baseName.toLowerCase() &&
+          rec.mobile?.trim() === b.mobile!.trim()
+        );
+      }
     );
     if (duplicate) {
-      res.status(409).json({ error: "Sorry! This mobile number already exist" });
+      res.status(409).json({ error: "Sorry! This customer already exists with this name and mobile number" });
       return;
     }
   }
-  const count = existing.filter((r) => (r as { entityType?: string }).entityType === "CUSTOMER").length + 1;
-  const customerNumber = `CU${String(count).padStart(4, "0")}`;
+  // Get highest existing customer number
+const customerNumbers = existing
+  .filter((r) => (r as { entityType?: string }).entityType === "CUSTOMER")
+  .map((r) => {
+    const num = (r as CustomerRecord).customerNumber || "";
+    return Number(num.replace("CU", ""));
+  })
+  .filter((n) => !isNaN(n));
+
+const nextNumber =
+  customerNumbers.length > 0
+    ? Math.max(...customerNumbers) + 1
+    : 1;
+
+const customerNumber = `CU${String(nextNumber).padStart(4, "0")}`;
   const id = uuid();
   const rec: CustomerRecord = {
     pk: `CUSTOMER#${id}`,

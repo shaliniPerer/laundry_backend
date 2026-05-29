@@ -142,9 +142,28 @@ dashboardRouter.get("/stats", async (req, res) => {
     expenses: monthlyExpenses[m] || 0,
   }));
 
-  res.json({ statusCounts, paymentCounts, monthlyData, monthlySales,
+  // Calculate totalInvoices, totalInvoicesAmount, totalReceivedAmount, totalDueAmount
+  const totalInvoices = sales.length;
+  const totalInvoicesAmount = sales.reduce((sum, s) => sum + Number(s.total || 0), 0);
+  // Use paidAmount if present, else sum payments array, else 0
+  const totalReceivedAmount = sales.reduce((sum, s) => {
+    if (typeof s.paidAmount === 'number') return sum + Number(s.paidAmount || 0);
+    if (Array.isArray(s.payments)) return sum + s.payments.reduce((pSum, p) => pSum + Number(p.amount || 0), 0);
+    return sum;
+  }, 0);
+  const totalDueAmount = totalInvoicesAmount - totalReceivedAmount;
+
+  res.json({
+    statusCounts,
+    paymentCounts,
+    monthlyData,
+    monthlySales,
     totalCustomers: customerItems.filter(c => (c as CustomerRecord).entityType === "CUSTOMER").length,
     totalExpensesAmount: allExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0),
+    totalInvoices,
+    totalInvoicesAmount,
+    totalReceivedAmount,
+    totalDueAmount,
   });
 });
 
