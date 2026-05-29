@@ -259,6 +259,31 @@ salesRouter.delete("/:id/payments/:paymentId", async (req, res) => {
   res.json({ ok: true, paidAmount, paymentStatus });
 });
 
+/** PATCH /api/sales/:id/payments/:paymentId */
+salesRouter.patch("/:id/payments/:paymentId", async (req, res) => {
+  const existing = await getItem(`SALE#${req.params.id}`, "META") as SaleRecord | undefined;
+  if (!existing || existing.entityType !== "SALE") {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  const { amount, paymentType, date, note } = req.body as { amount?: number; paymentType?: string; date?: string; note?: string };
+  const payments = (existing.payments ?? []).map((p) =>
+    p.id === req.params.paymentId
+      ? {
+          ...p,
+          ...(amount != null ? { amount: Number(amount) } : {}),
+          ...(paymentType ? { paymentType } : {}),
+          ...(date ? { date } : {}),
+          ...(note !== undefined ? { note } : {}),
+        }
+      : p
+  );
+  const paidAmount = payments.reduce((s, p) => s + p.amount, 0);
+  const paymentStatus = paidAmount <= 0 ? "Unpaid" : paidAmount >= existing.total ? "Paid" : "Partial";
+  await updateItem(`SALE#${req.params.id}`, "META", { payments, paidAmount, paymentStatus, updatedAt: now() });
+  res.json({ ok: true, paidAmount, paymentStatus });
+});
+
 /** PUT /api/sales/:id — edit a sale */
 salesRouter.put("/:id", async (req: AuthedRequest, res) => {
   const existing = await getItem(`SALE#${req.params.id}`, "META") as SaleRecord | undefined;

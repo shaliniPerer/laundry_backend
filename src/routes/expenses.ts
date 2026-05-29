@@ -9,7 +9,7 @@ import { authMiddleware } from "../middleware/auth.js";
 
 const now = () => new Date().toISOString();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const expenseUploadsDir = path.resolve(__dirname, "../../uploads/expenses");
+const expenseUploadsDir = path.resolve(__dirname, "../../public/expenses");
 
 type IncomingAttachment = {
   fileName?: string;
@@ -39,7 +39,7 @@ async function saveExpenseAttachment(expenseId: string, attachment?: IncomingAtt
     fileName: attachment.fileName,
     mimeType: attachment.mimeType,
     size: buffer.length,
-    url: `/uploads/expenses/${savedName}`,
+    url: `/public/expenses/${savedName}`,
   };
 }
 

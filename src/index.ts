@@ -19,10 +19,12 @@ import { startEventEngine } from "./sms/eventEngine.js";
 const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.resolve(__dirname, "../uploads");
+const publicDir = path.resolve(__dirname, "../public");
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: "10mb" }));
 app.use("/uploads", express.static(uploadsDir));
+app.use("/public", express.static(publicDir));
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "laundry-api" });

@@ -16,12 +16,27 @@ customersRouter.get("/", async (_req, res) => {
 
 customersRouter.post("/", async (req, res) => {
   const b = req.body as Partial<CustomerRecord>;
-  if (!b.name) {
+  // Build name from salutation + firstName + lastName if not explicitly provided
+  const derivedName =
+    b.name?.trim() ||
+    [b.salutation, b.firstName, b.lastName].filter(Boolean).join(" ");
+  if (!derivedName) {
     res.status(400).json({ error: "name required" });
     return;
   }
-  // Generate sequential customer number
+  // Check mobile uniqueness
   const existing = await scanByEntityPrefix("CUSTOMER#");
+  if (b.mobile?.trim()) {
+    const duplicate = existing.find(
+      (r) =>
+        (r as CustomerRecord).entityType === "CUSTOMER" &&
+        (r as CustomerRecord).mobile?.trim() === b.mobile!.trim()
+    );
+    if (duplicate) {
+      res.status(409).json({ error: "Sorry! This mobile number already exist" });
+      return;
+    }
+  }
   const count = existing.filter((r) => (r as { entityType?: string }).entityType === "CUSTOMER").length + 1;
   const customerNumber = `CU${String(count).padStart(4, "0")}`;
   const id = uuid();
@@ -30,8 +45,11 @@ customersRouter.post("/", async (req, res) => {
     sk: "PROFILE",
     entityType: "CUSTOMER",
     customerNumber,
-    name: b.name,
-    mobile: b.mobile,
+    salutation: b.salutation,
+    firstName: b.firstName,
+    lastName: b.lastName,
+    name: derivedName,
+    mobile: b.mobile?.trim() || undefined,
     phone: b.phone,
     email: b.email,
     gstNumber: b.gstNumber,
@@ -111,7 +129,24 @@ customersRouter.patch("/:id", async (req, res) => {
     return;
   }
   const b = req.body as Partial<CustomerRecord>;
+  // Check mobile uniqueness on update (skip current record)
+  if (b.mobile?.trim()) {
+    const all = await scanByEntityPrefix("CUSTOMER#");
+    const duplicate = all.find(
+      (r) =>
+        (r as CustomerRecord).entityType === "CUSTOMER" &&
+        (r as CustomerRecord).pk !== pk &&
+        (r as CustomerRecord).mobile?.trim() === b.mobile!.trim()
+    );
+    if (duplicate) {
+      res.status(409).json({ error: "Sorry! This mobile number already exist" });
+      return;
+    }
+  }
   await updateItem(pk, "PROFILE", {
+    ...(b.salutation != null ? { salutation: b.salutation } : {}),
+    ...(b.firstName != null ? { firstName: b.firstName } : {}),
+    ...(b.lastName != null ? { lastName: b.lastName } : {}),
     ...(b.name != null ? { name: b.name } : {}),
     ...(b.mobile != null ? { mobile: b.mobile } : {}),
     ...(b.phone != null ? { phone: b.phone } : {}),

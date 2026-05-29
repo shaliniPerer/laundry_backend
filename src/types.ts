@@ -19,6 +19,9 @@ export type UserRecord = EntityBase & {
 export type CustomerRecord = EntityBase & {
   entityType: "CUSTOMER";
   customerNumber?: string;
+  salutation?: string;
+  firstName?: string;
+  lastName?: string;
   name: string;
   mobile?: string;
   phone?: string;

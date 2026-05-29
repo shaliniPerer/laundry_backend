@@ -55,9 +55,10 @@ dashboardRouter.get("/deliveries", async (req, res) => {
 });
 
 dashboardRouter.get("/stats", async (req, res) => {
-  const [saleItems, expenseItems] = await Promise.all([
+  const [saleItems, expenseItems, customerItems] = await Promise.all([
     scanByEntityPrefix("SALE#"),
     scanByEntityPrefix("EXPENSE#"),
+    scanByEntityPrefix("CUSTOMER#"),
   ]);
 
   const start = req.query.start ? String(req.query.start) : undefined;
@@ -141,5 +142,42 @@ dashboardRouter.get("/stats", async (req, res) => {
     expenses: monthlyExpenses[m] || 0,
   }));
 
-  res.json({ statusCounts, paymentCounts, monthlyData, monthlySales });
+  res.json({ statusCounts, paymentCounts, monthlyData, monthlySales,
+    totalCustomers: customerItems.filter(c => (c as CustomerRecord).entityType === "CUSTOMER").length,
+    totalExpensesAmount: allExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0),
+  });
+});
+
+dashboardRouter.get("/today", async (req, res) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const [saleItems, customerItems, expenseItems] = await Promise.all([
+    scanByEntityPrefix("SALE#"),
+    scanByEntityPrefix("CUSTOMER#"),
+    scanByEntityPrefix("EXPENSE#"),
+  ]);
+  const todaySales = (saleItems as SaleRecord[]).filter(
+    r => r.entityType === "SALE" && (r.createdAt || "").slice(0, 10) === today
+  );
+  const todayCustomers = (customerItems as CustomerRecord[]).filter(
+    r => r.entityType === "CUSTOMER" && (r.createdAt || "").slice(0, 10) === today
+  );
+  const todayExpenseItems = (expenseItems as ExpenseRecord[]).filter(
+    r => r.entityType === "EXPENSE" && r.date === today
+  );
+  let todayReceivedAmount = 0;
+  for (const sale of saleItems as SaleRecord[]) {
+    if (sale.entityType !== "SALE" || !sale.payments) continue;
+    for (const p of sale.payments as Array<{ date?: string; amount?: number }>) {
+      if ((p.date || "").slice(0, 10) === today) {
+        todayReceivedAmount += Number(p.amount || 0);
+      }
+    }
+  }
+  res.json({
+    todayInvoices: todaySales.length,
+    todayNewCustomers: todayCustomers.length,
+    todaySalesAmount: todaySales.reduce((sum, s) => sum + Number(s.total || 0), 0),
+    todayReceivedAmount,
+    todayExpensesAmount: todayExpenseItems.reduce((sum, e) => sum + Number(e.amount || 0), 0),
+  });
 });
